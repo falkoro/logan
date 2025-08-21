@@ -1,0 +1,111 @@
+# Logan Dashboard - .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.production
+.env.development
+*.env
+config.ini
+secrets.json
+credentials.json
+
+# SSH Keys & Certificates
+*.pem
+*.key
+*.crt
+*.p12
+id_rsa*
+id_ed25519*
+known_hosts
+authorized_keys
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+log/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+.cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Azure
+.azure/
+
+# Local test files
+test_local.py
+local_test.py
+
+# Personal notes
+notes.txt
+todo.txt
+NOTES.md
