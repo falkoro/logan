@@ -1,0 +1,62 @@
+# Logan Dashboard - .dockerignore
+
+# Git
+.git
+.github
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.venv
+venv
+.env
+
+# Documentation
+README.md
+DOCKER_HUB_DEPLOYMENT.md
+DEPLOYMENT.md
+QUICKSTART.md
+PROJECT_PROMPT.md
+*.md
+docs/
+
+# Tests
+tests/
+test_*.py
+*_test.py
+.pytest_cache
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Development
+.env.example
+docker-compose.*.yml
+deploy.sh
+deploy.bat
+
+# Local SSH keys (security)
+*.pem
+*.key
+id_rsa*
+known_hosts
