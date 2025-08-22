@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker build:*)",
+      "Bash(python:*)",
+      "Bash(set FLASK_APP=run.py)",
+      "Bash(set:*)",
+      "Bash(set PORT=8080)",
+      "Bash(set REMOTE_HOST=localhost)",
+      "Bash(pip install:*)",
+      "Bash(\"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe\" --version)",
+      "Bash(where docker)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

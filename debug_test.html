@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Test</title>
+</head>
+<body>
+    <h1>Debug Test</h1>
+    <div id="output"></div>
+    
+    <script>
+        // Test what functions are available
+        const output = document.getElementById('output');
+        
+        function log(message) {
+            output.innerHTML += `<p>${message}</p>`;
+            console.log(message);
+        }
+        
+        window.addEventListener('DOMContentLoaded', function() {
+            log('DOM loaded');
+            
+            // Test direct fetch to the API
+            fetch('http://127.0.0.1:9000/api/containers/overview')
+                .then(response => response.json())
+                .then(data => {
+                    log('API response: ' + JSON.stringify(data));
+                })
+                .catch(error => {
+                    log('API error: ' + error.message);
+                });
+                
+            // Test if container elements exist
+            const containerStats = document.getElementById('container-count');
+            log('container-count element exists: ' + (containerStats !== null));
+            
+            const runningContainers = document.getElementById('running-containers');
+            log('running-containers element exists: ' + (runningContainers !== null));
+        });
+    </script>
+</body>
+</html>

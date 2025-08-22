@@ -1,0 +1,188 @@
+<!-- Logs Viewer -->
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Container Logs</h2>
+            <p class="text-gray-500 dark:text-gray-400">View and search container logs in real-time</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <!-- Container Selection -->
+            <select id="log-container-select" class="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm min-w-48">
+                <option value="">Select Container...</option>
+            </select>
+            
+            <!-- Lines Count -->
+            <select id="log-lines-select" class="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+                <option value="50">50 lines</option>
+                <option value="100" selected>100 lines</option>
+                <option value="200">200 lines</option>
+                <option value="500">500 lines</option>
+            </select>
+            
+            <!-- Auto Refresh Toggle -->
+            <label class="flex items-center">
+                <input type="checkbox" id="auto-refresh-logs" class="rounded border-gray-300 dark:border-gray-600">
+                <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Auto-refresh</span>
+            </label>
+            
+            <!-- Clear Logs -->
+            <button onclick="clearLogs()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-trash mr-2"></i>
+                Clear
+            </button>
+            
+            <!-- Refresh -->
+            <button onclick="refreshLogs()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div class="flex flex-col lg:flex-row lg:items-center space-y-4 lg:space-y-0 lg:space-x-4">
+            <!-- Search Input -->
+            <div class="flex-1">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-search text-gray-400"></i>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="log-search" 
+                        placeholder="Search logs..." 
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                </div>
+            </div>
+            
+            <!-- Log Level Filter -->
+            <select id="log-level-filter" class="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+                <option value="">All Levels</option>
+                <option value="ERROR">Error</option>
+                <option value="WARN">Warning</option>
+                <option value="INFO">Info</option>
+                <option value="DEBUG">Debug</option>
+            </select>
+            
+            <!-- Time Range -->
+            <select id="log-time-filter" class="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+                <option value="">All Time</option>
+                <option value="1h">Last Hour</option>
+                <option value="6h">Last 6 Hours</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Log Statistics -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <i class="fas fa-file-alt text-blue-600 dark:text-blue-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Lines</p>
+                    <p id="total-log-lines" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                    <i class="fas fa-exclamation-triangle text-red-600 dark:text-red-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Errors</p>
+                    <p id="error-log-count" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                    <i class="fas fa-exclamation-circle text-yellow-600 dark:text-yellow-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Warnings</p>
+                    <p id="warning-log-count" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <i class="fas fa-info-circle text-green-600 dark:text-green-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Last Updated</p>
+                    <p id="log-last-updated" class="text-sm font-medium text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-terminal text-gray-500 mr-2"></i>
+                    Container Logs
+                    <span id="current-container-name" class="ml-2 px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-300 text-sm rounded-full"></span>
+                </h3>
+                <div class="flex items-center space-x-2">
+                    <button onclick="exportLogs()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded text-sm">
+                        <i class="fas fa-download mr-1"></i>Export
+                    </button>
+                    <button onclick="toggleWrap()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded text-sm">
+                        <i class="fas fa-text-width mr-1"></i>Wrap
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="relative">
+            <div 
+                id="log-content" 
+                class="font-mono text-sm bg-gray-900 text-green-400 p-4 h-96 overflow-auto whitespace-pre-wrap"
+            >
+                <div class="text-center text-gray-500 py-8">
+                    Select a container to view its logs
+                </div>
+            </div>
+            
+            <!-- Loading overlay -->
+            <div id="log-loading" class="hidden absolute inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center">
+                <div class="text-white flex items-center space-x-2">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Loading logs...</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700">
+            <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
+                <div class="flex items-center space-x-4">
+                    <span id="log-status">Ready</span>
+                    <span id="filtered-lines-count">0 lines</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="scrollToTop()" class="p-1 hover:text-gray-700 dark:hover:text-gray-300">
+                        <i class="fas fa-arrow-up"></i>
+                    </button>
+                    <button onclick="scrollToBottom()" class="p-1 hover:text-gray-700 dark:hover:text-gray-300">
+                        <i class="fas fa-arrow-down"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

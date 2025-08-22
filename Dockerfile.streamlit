@@ -1,0 +1,75 @@
+# LoganGemma Dashboard - Streamlit Docker Image
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    STREAMLIT_SERVER_PORT=8501 \
+    STREAMLIT_SERVER_ADDRESS=0.0.0.0 \
+    STREAMLIT_SERVER_HEADLESS=true \
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        curl \
+        && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r streamlit && \
+    useradd -r -g streamlit -d /app -s /bin/bash streamlit
+
+# Copy requirements for Streamlit
+COPY <<EOF requirements-streamlit.txt
+streamlit>=1.48.0
+pandas>=2.0.0
+docker>=7.0.0
+requests>=2.25.0
+plotly>=5.0.0
+EOF
+
+# Install Python dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements-streamlit.txt
+
+# Copy LoganGemma dashboard
+COPY logangemma_dashboard.py .
+
+# Create necessary directories and set permissions
+RUN mkdir -p /app/.streamlit && \
+    chown -R streamlit:streamlit /app
+
+# Streamlit config
+COPY <<EOF .streamlit/config.toml
+[server]
+port = 8501
+address = "0.0.0.0"
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#3b82f6"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f8fafc"
+textColor = "#1f2937"
+EOF
+
+# Switch to non-root user
+USER streamlit
+
+# Expose port
+EXPOSE 8501
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8501/_stcore/health || exit 1
+
+# Run LoganGemma Dashboard
+CMD ["streamlit", "run", "logangemma_dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]

@@ -1,159 +1,193 @@
-"""Container model for representing Docker containers."""
-from dataclasses import dataclass, field
+"""
+Container model for representing Docker containers
+"""
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from dataclasses import dataclass, field
+from enum import Enum
 
+class ContainerStatus(Enum):
+    """Container status enumeration"""
+    RUNNING = "running"
+    STOPPED = "stopped"
+    PAUSED = "paused"
+    RESTARTING = "restarting"
+    ERROR = "error"
+    UNKNOWN = "unknown"
 
 @dataclass
-class ContainerModel:
-    """Model representing a Docker container."""
-    
+class ContainerPort:
+    """Represents a container port mapping"""
+    container_port: int
+    host_port: int
+    protocol: str = "tcp"
+    host_ip: str = "0.0.0.0"
+
+@dataclass
+class ContainerStats:
+    """Container resource statistics"""
+    cpu_percent: float = 0.0
+    memory_usage: int = 0
+    memory_limit: int = 0
+    memory_percent: float = 0.0
+    network_rx: int = 0
+    network_tx: int = 0
+    disk_read: int = 0
+    disk_write: int = 0
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+@dataclass
+class Container:
+    """Docker container representation"""
     id: str
     name: str
     image: str
-    status: str
-    state: str
+    status: ContainerStatus
     created: datetime
-    ports: Dict[str, List[Dict[str, str]]] = field(default_factory=dict)
-    labels: Dict[str, str] = field(default_factory=dict)
-    networks: Dict[str, Any] = field(default_factory=dict)
-    mounts: List[Dict[str, str]] = field(default_factory=list)
+    started: Optional[datetime] = None
+    ports: List[ContainerPort] = field(default_factory=list)
     environment: Dict[str, str] = field(default_factory=dict)
-    
-    # Service-specific information
-    service_name: Optional[str] = None
-    service_port: Optional[int] = None
-    service_category: Optional[str] = None
-    vpn_required: bool = False
+    labels: Dict[str, str] = field(default_factory=dict)
+    command: str = ""
+    size: str = ""
+    networks: List[str] = field(default_factory=list)
+    # Additional computed properties for the frontend
+    is_running: bool = field(default=False)
+    is_healthy: bool = field(default=True)
     health_status: Optional[str] = None
+    restart_policy: str = "no"
+    stats: Optional[ContainerStats] = None
+    logs_tail: List[str] = field(default_factory=list)
+    health_status: Optional[str] = None
+    restart_policy: str = "no"
+    stats: Optional[ContainerStats] = None
+    logs_tail: List[str] = field(default_factory=list)
     
     @property
     def is_running(self) -> bool:
-        """Check if container is running."""
-        return self.state.lower() == 'running'
+        """Check if container is running"""
+        return self.status == ContainerStatus.RUNNING
     
     @property
-    def main_port(self) -> Optional[int]:
-        """Get the main exposed port for this container."""
-        if self.service_port:
-            return self.service_port
-            
-        # Try to extract from ports mapping
-        for container_port, host_mappings in self.ports.items():
-            if host_mappings:
-                try:
-                    return int(host_mappings[0].get('HostPort', 0))
-                except (ValueError, KeyError):
-                    continue
-        return None
+    def is_healthy(self) -> bool:
+        """Check if container is healthy"""
+        if self.health_status is None:
+            return self.is_running
+        return self.health_status == "healthy"
     
     @property
-    def web_url(self) -> Optional[str]:
-        """Get the web URL for this service if applicable."""
-        if self.main_port:
-            return f"http://logan-GL502VS:{self.main_port}"
-        return None
+    def uptime(self) -> Optional[str]:
+        """Get container uptime as human readable string"""
+        if not self.started or not self.is_running:
+            return None
+        
+        # Use timezone-aware datetime for comparison
+        now = datetime.now(timezone.utc)
+        # Ensure both datetimes are timezone-aware
+        started = self.started
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        
+        delta = now - started
+        days = delta.days
+        hours, remainder = divmod(delta.seconds, 3600)
+        minutes, _ = divmod(remainder, 60)
+        
+        if days > 0:
+            return f"{days}d {hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
+    
+    @property
+    def memory_usage_mb(self) -> float:
+        """Get memory usage in MB"""
+        if self.stats:
+            return self.stats.memory_usage / (1024 * 1024)
+        return 0.0
+    
+    @property
+    def primary_port(self) -> Optional[int]:
+        """Get the primary exposed port"""
+        if not self.ports:
+            return None
+        return min(port.host_port for port in self.ports)
+    
+    @classmethod
+    def from_docker_dict(cls, docker_dict: Dict[str, Any]) -> 'Container':
+        """Create Container instance from Docker API response"""
+        # Parse container status
+        state = docker_dict.get('State', {})
+        status_map = {
+            'running': ContainerStatus.RUNNING,
+            'exited': ContainerStatus.STOPPED,
+            'paused': ContainerStatus.PAUSED,
+            'restarting': ContainerStatus.RESTARTING,
+            'dead': ContainerStatus.ERROR,
+        }
+        status = status_map.get(state.get('Status', '').lower(), ContainerStatus.UNKNOWN)
+        
+        # Parse ports
+        ports = []
+        port_bindings = docker_dict.get('HostConfig', {}).get('PortBindings') or {}
+        for container_port, bindings in port_bindings.items():
+            if bindings:
+                for binding in bindings:
+                    port_info = container_port.split('/')
+                    ports.append(ContainerPort(
+                        container_port=int(port_info[0]),
+                        host_port=int(binding['HostPort']),
+                        protocol=port_info[1] if len(port_info) > 1 else 'tcp',
+                        host_ip=binding.get('HostIp', '0.0.0.0')
+                    ))
+        
+        # Parse dates
+        created = datetime.fromisoformat(docker_dict['Created'].replace('Z', '+00:00'))
+        started = None
+        if state.get('StartedAt') and state['StartedAt'] != '0001-01-01T00:00:00Z':
+            started = datetime.fromisoformat(state['StartedAt'].replace('Z', '+00:00'))
+        
+        return cls(
+            id=docker_dict['Id'][:12],  # Short ID
+            name=docker_dict['Name'].lstrip('/'),
+            image=docker_dict['Config']['Image'],
+            status=status,
+            created=created,
+            started=started,
+            ports=ports,
+            environment=dict(env.split('=', 1) for env in docker_dict.get('Config', {}).get('Env', []) if '=' in env),
+            labels=docker_dict.get('Config', {}).get('Labels') or {},
+            health_status=state.get('Health', {}).get('Status'),
+            restart_policy=docker_dict.get('HostConfig', {}).get('RestartPolicy', {}).get('Name', 'no'),
+            is_running=status == ContainerStatus.RUNNING,
+            is_healthy=state.get('Health', {}).get('Status') != 'unhealthy' if state.get('Health') else True
+        )
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert container model to dictionary."""
+        """Convert container to dictionary for API responses"""
         return {
             'id': self.id,
             'name': self.name,
             'image': self.image,
-            'status': self.status,
-            'state': self.state,
-            'created': self.created.isoformat() if self.created else None,
-            'ports': self.ports,
-            'labels': self.labels,
-            'networks': self.networks,
-            'mounts': self.mounts,
-            'environment': self.environment,
-            'service_name': self.service_name,
-            'service_port': self.service_port,
-            'service_category': self.service_category,
-            'vpn_required': self.vpn_required,
+            'status': self.status.value,
+            'created': self.created.isoformat(),
+            'started': self.started.isoformat() if self.started else None,
+            'ports': [f"{p.host_ip}:{p.host_port}→{p.container_port}/{p.protocol}" for p in self.ports] if self.ports else [],
             'health_status': self.health_status,
             'is_running': self.is_running,
-            'main_port': self.main_port,
-            'web_url': self.web_url
+            'is_healthy': self.is_healthy,
+            'uptime': self.uptime,
+            'primary_port': self.primary_port,
+            'restart_policy': self.restart_policy,
+            'command': self.command,
+            'size': self.size,
+            'networks': self.networks,
+            'stats': {
+                'cpu_percent': self.stats.cpu_percent,
+                'memory_usage_mb': self.memory_usage_mb,
+                'memory_percent': self.stats.memory_percent,
+                'network_rx': self.stats.network_rx,
+                'network_tx': self.stats.network_tx
+            } if self.stats else None
         }
-    
-    @classmethod
-    def from_docker_container(cls, container_data: Dict[str, Any], service_config: Dict[str, Any] = None) -> 'ContainerModel':
-        """Create ContainerModel from Docker API response."""
-        # Extract basic container information
-        container_id = container_data.get('Id', '')
-        name = container_data.get('Name', '').lstrip('/')
-        image = container_data.get('Config', {}).get('Image', '')
-        status = container_data.get('State', {}).get('Status', 'unknown')
-        state = container_data.get('State', {}).get('Status', 'unknown')
-        
-        # Parse creation time
-        created_str = container_data.get('Created', '')
-        created = None
-        if created_str:
-            try:
-                created = datetime.fromisoformat(created_str.replace('Z', '+00:00'))
-            except ValueError:
-                created = datetime.now()
-        
-        # Extract port mappings
-        ports = {}
-        network_settings = container_data.get('NetworkSettings', {})
-        port_bindings = network_settings.get('Ports', {})
-        if port_bindings:
-            ports = port_bindings
-        
-        # Extract labels
-        labels = container_data.get('Config', {}).get('Labels') or {}
-        
-        # Extract networks
-        networks = network_settings.get('Networks', {})
-        
-        # Extract mounts
-        mounts = container_data.get('Mounts', [])
-        
-        # Extract environment variables
-        env_list = container_data.get('Config', {}).get('Env', [])
-        environment = {}
-        for env_var in env_list:
-            if '=' in env_var:
-                key, value = env_var.split('=', 1)
-                environment[key] = value
-        
-        # Add service-specific information if provided
-        service_name = None
-        service_port = None
-        service_category = None
-        vpn_required = False
-        
-        if service_config:
-            service_name = service_config.get('name')
-            service_port = service_config.get('port')
-            service_category = service_config.get('category')
-            vpn_required = service_config.get('vpn_required', False)
-        
-        # Try to determine health status
-        health_status = None
-        health_data = container_data.get('State', {}).get('Health')
-        if health_data:
-            health_status = health_data.get('Status', 'unknown')
-        
-        return cls(
-            id=container_id,
-            name=name,
-            image=image,
-            status=status,
-            state=state,
-            created=created,
-            ports=ports,
-            labels=labels,
-            networks=networks,
-            mounts=mounts,
-            environment=environment,
-            service_name=service_name,
-            service_port=service_port,
-            service_category=service_category,
-            vpn_required=vpn_required,
-            health_status=health_status
-        )

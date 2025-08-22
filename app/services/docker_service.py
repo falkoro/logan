@@ -1,394 +1,423 @@
-"""Docker service for managing remote Docker containers via SSH."""
+"""
+Docker Service for managing containers via SSH
+"""
 import json
 import logging
-from typing import List, Dict, Any, Optional
 from datetime import datetime
-import re
-
-from ..models.container import ContainerModel
-from .ssh_service import SSHService
+from typing import List, Dict, Any, Optional, Tuple
+from app.models.container import Container, ContainerStatus, ContainerStats
+from app.services.ssh_service import SSHService, SSHConnectionError
 
 logger = logging.getLogger(__name__)
 
+class DockerServiceError(Exception):
+    """Docker service related errors"""
+    pass
 
 class DockerService:
-    """Service for managing Docker containers on remote hosts."""
+    """Service for managing Docker containers on remote host"""
     
-    def __init__(self, ssh_service: SSHService, managed_services: Dict[str, Any]):
-        """Initialize Docker service.
-        
-        Args:
-            ssh_service: SSH service for remote connections
-            managed_services: Dictionary of managed services configuration
-        """
+    def __init__(self, ssh_service: SSHService):
         self.ssh = ssh_service
-        self.managed_services = managed_services
+        self._containers_cache: Dict[str, Container] = {}
+        self._last_update: Optional[datetime] = None
         
-    def list_containers(self, all_containers: bool = True) -> List[ContainerModel]:
-        """List all containers on the remote host.
+    def list_containers(self, include_stopped: bool = True, quick_mode: bool = False) -> List[Container]:
+        """
+        List all containers on remote host
         
         Args:
-            all_containers: If True, list all containers, otherwise only running ones
+            include_stopped: Include stopped containers in the list
+            quick_mode: If True, only get basic info without stats and logs
             
         Returns:
-            List of ContainerModel objects
+            List of Container objects
         """
         try:
-            cmd = "ps -a --format json" if all_containers else "ps --format json"
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd)
+            # Build Docker command
+            cmd_args = "ps -a --format json" if include_stopped else "ps --format json"
+            
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd_args)
             
             if exit_code != 0:
                 logger.error(f"Failed to list containers: {stderr}")
-                return []
+                raise DockerServiceError(f"Failed to list containers: {stderr}")
             
-            if not stdout.strip():
-                logger.info("No containers found")
-                return []
-            
-            # Parse JSON output
             containers = []
-            try:
-                # Docker ps --format json outputs one JSON object per line
+            if stdout.strip():
+                # Docker ps --format json returns one JSON object per line
                 for line in stdout.strip().split('\n'):
-                    if line.strip():
+                    try:
                         container_data = json.loads(line)
-                        containers.append(self._parse_container_summary(container_data))
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse container list JSON: {e}")
-                return []
+                        if quick_mode:
+                            # Create container from basic ps data only
+                            container = self._create_basic_container(container_data)
+                            if container:
+                                containers.append(container)
+                        else:
+                            # Get detailed information for each container
+                            detailed_container = self.get_container_details(container_data['Names'])
+                            if detailed_container:
+                                containers.append(detailed_container)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse container JSON: {e}")
+                        continue
+            
+            # Update cache
+            if not quick_mode:
+                self._containers_cache = {c.name: c for c in containers}
+                self._last_update = datetime.now()
             
             return containers
             
+        except SSHConnectionError as e:
+            logger.error(f"SSH connection error while listing containers: {e}")
+            raise DockerServiceError(f"Connection error: {e}")
         except Exception as e:
-            logger.error(f"Error listing containers: {e}")
-            return []
+            logger.error(f"Unexpected error listing containers: {e}")
+            raise DockerServiceError(f"Unexpected error: {e}")
     
-    def get_container_details(self, container_id_or_name: str) -> Optional[ContainerModel]:
-        """Get detailed information about a specific container.
+    def _create_basic_container(self, ps_data: Dict[str, Any]) -> Optional[Container]:
+        """
+        Create a basic container object from docker ps data
         
         Args:
-            container_id_or_name: Container ID or name
+            ps_data: Dictionary from docker ps JSON output
             
         Returns:
-            ContainerModel object or None if not found
+            Basic Container object or None if invalid data
         """
         try:
-            cmd = f"inspect {container_id_or_name}"
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd)
+            # Map status to our enum
+            state = ps_data.get('State', '').lower()
+            if 'running' in state:
+                status = ContainerStatus.RUNNING
+            elif 'exited' in state:
+                status = ContainerStatus.EXITED
+            elif 'paused' in state:
+                status = ContainerStatus.PAUSED
+            else:
+                status = ContainerStatus.CREATED
             
-            if exit_code != 0:
-                logger.error(f"Failed to inspect container {container_id_or_name}: {stderr}")
-                return None
+            # Create basic container
+            container = Container(
+                id=ps_data.get('ID', ''),
+                name=ps_data.get('Names', '').lstrip('/'),  # Remove leading slash
+                image=ps_data.get('Image', ''),
+                status=status,
+                is_running=status == ContainerStatus.RUNNING,
+                created=ps_data.get('CreatedAt', ''),
+                ports=ps_data.get('Ports', '').split(', ') if ps_data.get('Ports') else [],
+                command=ps_data.get('Command', ''),
+                size=ps_data.get('Size', ''),
+                networks=ps_data.get('Networks', '').split(', ') if ps_data.get('Networks') else []
+            )
             
-            try:
-                container_data = json.loads(stdout)
-                if isinstance(container_data, list) and container_data:
-                    container_info = container_data[0]
-                    return self._parse_container_details(container_info)
-                else:
-                    logger.error("Invalid container inspect response")
-                    return None
-                    
-            except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse container details JSON: {e}")
-                return None
-                
+            return container
+            
         except Exception as e:
-            logger.error(f"Error getting container details: {e}")
+            logger.error(f"Failed to create basic container from ps data: {e}")
             return None
     
-    def start_container(self, container_id_or_name: str) -> bool:
-        """Start a container.
+    def get_container_details(self, container_name: str) -> Optional[Container]:
+        """
+        Get detailed information about a specific container
         
         Args:
-            container_id_or_name: Container ID or name
+            container_name: Name or ID of the container
             
         Returns:
-            bool: True if successful, False otherwise
+            Container object or None if not found
         """
         try:
-            cmd = f"start {container_id_or_name}"
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd)
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(f"inspect {container_name}")
             
-            if exit_code == 0:
-                logger.info(f"Container {container_id_or_name} started successfully")
-                return True
-            else:
-                logger.error(f"Failed to start container {container_id_or_name}: {stderr}")
-                return False
-                
+            if exit_code != 0:
+                logger.error(f"Failed to inspect container {container_name}: {stderr}")
+                return None
+            
+            container_data = json.loads(stdout)[0]  # inspect returns a list
+            container = Container.from_docker_dict(container_data)
+            
+            # Get container stats if running
+            if container.is_running:
+                stats = self.get_container_stats(container_name)
+                container.stats = stats
+            
+            # Get recent logs
+            logs = self.ssh.get_container_logs(container_name, lines=10)
+            container.logs_tail = logs
+            
+            return container
+            
+        except (json.JSONDecodeError, IndexError, KeyError) as e:
+            logger.error(f"Failed to parse container details for {container_name}: {e}")
+            return None
         except Exception as e:
-            logger.error(f"Error starting container: {e}")
-            return False
+            logger.error(f"Error getting container details for {container_name}: {e}")
+            return None
     
-    def stop_container(self, container_id_or_name: str, timeout: int = 10) -> bool:
-        """Stop a container.
+    def get_container_stats(self, container_name: str) -> Optional[ContainerStats]:
+        """
+        Get resource statistics for a container
         
         Args:
-            container_id_or_name: Container ID or name
-            timeout: Graceful shutdown timeout in seconds
+            container_name: Name or ID of the container
             
         Returns:
-            bool: True if successful, False otherwise
+            ContainerStats object or None if not available
         """
         try:
-            cmd = f"stop --time {timeout} {container_id_or_name}"
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd, timeout=timeout + 10)
+            # Get stats without streaming (--no-stream)
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(
+                f"stats --no-stream --format json {container_name}",
+                timeout=15
+            )
             
-            if exit_code == 0:
-                logger.info(f"Container {container_id_or_name} stopped successfully")
-                return True
-            else:
-                logger.error(f"Failed to stop container {container_id_or_name}: {stderr}")
-                return False
+            if exit_code != 0:
+                logger.warning(f"Failed to get stats for {container_name}: {stderr}")
+                return None
+            
+            if not stdout.strip():
+                return None
                 
+            stats_data = json.loads(stdout.strip().split('\n')[0])  # First line
+            
+            # Parse memory usage
+            memory_usage = stats_data.get('MemUsage', '0B / 0B')
+            memory_parts = memory_usage.split(' / ')
+            memory_used_str = memory_parts[0].strip()
+            memory_limit_str = memory_parts[1].strip() if len(memory_parts) > 1 else '0B'
+            
+            # Convert memory strings to bytes
+            memory_used = self._parse_memory_string(memory_used_str)
+            memory_limit = self._parse_memory_string(memory_limit_str)
+            
+            # Parse CPU percentage
+            cpu_percent_str = stats_data.get('CPUPerc', '0.00%').rstrip('%')
+            cpu_percent = float(cpu_percent_str) if cpu_percent_str else 0.0
+            
+            # Parse memory percentage
+            mem_percent_str = stats_data.get('MemPerc', '0.00%').rstrip('%')
+            mem_percent = float(mem_percent_str) if mem_percent_str else 0.0
+            
+            # Parse network I/O
+            net_io = stats_data.get('NetIO', '0B / 0B')
+            net_parts = net_io.split(' / ')
+            net_rx = self._parse_memory_string(net_parts[0].strip()) if len(net_parts) > 0 else 0
+            net_tx = self._parse_memory_string(net_parts[1].strip()) if len(net_parts) > 1 else 0
+            
+            return ContainerStats(
+                cpu_percent=cpu_percent,
+                memory_usage=memory_used,
+                memory_limit=memory_limit,
+                memory_percent=mem_percent,
+                network_rx=net_rx,
+                network_tx=net_tx,
+                timestamp=datetime.now()
+            )
+            
+        except (json.JSONDecodeError, ValueError, IndexError) as e:
+            logger.warning(f"Failed to parse stats for {container_name}: {e}")
+            return None
         except Exception as e:
-            logger.error(f"Error stopping container: {e}")
-            return False
+            logger.error(f"Error getting stats for {container_name}: {e}")
+            return None
     
-    def restart_container(self, container_id_or_name: str, timeout: int = 10) -> bool:
-        """Restart a container.
+    def _parse_memory_string(self, mem_str: str) -> int:
+        """
+        Parse memory string (e.g., '1.5GB', '512MB') to bytes
         
         Args:
-            container_id_or_name: Container ID or name  
-            timeout: Graceful shutdown timeout in seconds
+            mem_str: Memory string to parse
             
         Returns:
-            bool: True if successful, False otherwise
+            Memory in bytes
         """
-        try:
-            cmd = f"restart --time {timeout} {container_id_or_name}"
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd, timeout=timeout + 20)
-            
-            if exit_code == 0:
-                logger.info(f"Container {container_id_or_name} restarted successfully")
-                return True
-            else:
-                logger.error(f"Failed to restart container {container_id_or_name}: {stderr}")
-                return False
-                
-        except Exception as e:
-            logger.error(f"Error restarting container: {e}")
-            return False
-    
-    def get_container_logs(self, container_id_or_name: str, tail: int = 100, 
-                          since: Optional[str] = None) -> str:
-        """Get container logs.
+        if not mem_str or mem_str == '0B':
+            return 0
         
-        Args:
-            container_id_or_name: Container ID or name
-            tail: Number of lines to show from end of logs
-            since: Show logs since timestamp (e.g., "2023-01-01T00:00:00")
-            
-        Returns:
-            str: Container logs
-        """
-        try:
-            cmd = f"logs --tail {tail}"
-            if since:
-                cmd += f" --since {since}"
-            cmd += f" {container_id_or_name}"
-            
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd, timeout=60)
-            
-            if exit_code == 0:
-                return stdout
-            else:
-                logger.error(f"Failed to get logs for container {container_id_or_name}: {stderr}")
-                return f"Error getting logs: {stderr}"
-                
-        except Exception as e:
-            logger.error(f"Error getting container logs: {e}")
-            return f"Error: {str(e)}"
-    
-    def get_container_stats(self, container_id_or_name: str) -> Dict[str, Any]:
-        """Get real-time container resource usage statistics.
+        mem_str = mem_str.strip().upper()
+        units = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4}
         
-        Args:
-            container_id_or_name: Container ID or name
-            
-        Returns:
-            Dict containing resource usage statistics
-        """
-        try:
-            cmd = f"stats --no-stream --format json {container_id_or_name}"
-            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd, timeout=30)
-            
-            if exit_code == 0 and stdout.strip():
+        for unit, multiplier in units.items():
+            if mem_str.endswith(unit):
                 try:
-                    stats_data = json.loads(stdout.strip())
-                    return stats_data
-                except json.JSONDecodeError:
-                    logger.error("Failed to parse container stats JSON")
-                    return {}
+                    value = float(mem_str[:-len(unit)])
+                    return int(value * multiplier)
+                except ValueError:
+                    return 0
+        
+        # Try to parse as plain number (assume bytes)
+        try:
+            return int(float(mem_str))
+        except ValueError:
+            return 0
+    
+    def start_container(self, container_name: str) -> bool:
+        """
+        Start a container
+        
+        Args:
+            container_name: Name or ID of the container
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(f"start {container_name}")
+            
+            if exit_code == 0:
+                logger.info(f"Container {container_name} started successfully")
+                return True
             else:
-                logger.error(f"Failed to get stats for container {container_id_or_name}: {stderr}")
-                return {}
+                logger.error(f"Failed to start container {container_name}: {stderr}")
+                return False
                 
         except Exception as e:
-            logger.error(f"Error getting container stats: {e}")
-            return {}
+            logger.error(f"Error starting container {container_name}: {e}")
+            return False
     
-    def get_managed_services_status(self) -> List[ContainerModel]:
-        """Get status of all managed services.
-        
-        Returns:
-            List of ContainerModel objects for managed services
+    def stop_container(self, container_name: str, timeout: int = 10) -> bool:
         """
-        all_containers = self.list_containers()
-        managed_containers = []
-        
-        for container in all_containers:
-            # Try to match container to managed service
-            service_config = self._match_container_to_service(container)
-            if service_config:
-                # Update container with service information
-                container.service_name = service_config.get('name')
-                container.service_port = service_config.get('port')
-                container.service_category = service_config.get('category')
-                container.vpn_required = service_config.get('vpn_required', False)
-                managed_containers.append(container)
-        
-        return managed_containers
-    
-    def _parse_container_summary(self, container_data: Dict[str, Any]) -> ContainerModel:
-        """Parse container summary from Docker ps output.
+        Stop a container
         
         Args:
-            container_data: Container data from Docker ps --format json
+            container_name: Name or ID of the container
+            timeout: Timeout in seconds before force kill
             
         Returns:
-            ContainerModel object
+            True if successful, False otherwise
         """
-        # Docker ps JSON format has different field names than inspect
-        container_id = container_data.get('ID', '')
-        name = container_data.get('Names', '').lstrip('/')
-        image = container_data.get('Image', '')
-        status = container_data.get('Status', '')
-        state = container_data.get('State', status)
-        
-        # Parse creation time from status
-        created = datetime.now()
-        created_str = container_data.get('CreatedAt', '')
-        if created_str:
-            try:
-                # Try to parse various date formats
-                created = datetime.strptime(created_str, '%Y-%m-%d %H:%M:%S %z')
-            except ValueError:
-                pass
-        
-        # Parse ports
-        ports = {}
-        ports_str = container_data.get('Ports', '')
-        if ports_str:
-            ports = self._parse_ports_string(ports_str)
-        
-        return ContainerModel(
-            id=container_id,
-            name=name,
-            image=image,
-            status=status,
-            state=state,
-            created=created,
-            ports=ports
-        )
+        try:
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(
+                f"stop --time {timeout} {container_name}"
+            )
+            
+            if exit_code == 0:
+                logger.info(f"Container {container_name} stopped successfully")
+                return True
+            else:
+                logger.error(f"Failed to stop container {container_name}: {stderr}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error stopping container {container_name}: {e}")
+            return False
     
-    def _parse_container_details(self, container_data: Dict[str, Any]) -> ContainerModel:
-        """Parse detailed container information from Docker inspect output.
+    def restart_container(self, container_name: str, timeout: int = 10) -> bool:
+        """
+        Restart a container
         
         Args:
-            container_data: Container data from Docker inspect
+            container_name: Name or ID of the container
+            timeout: Timeout in seconds before force kill
             
         Returns:
-            ContainerModel object with service configuration if matched
+            True if successful, False otherwise
         """
-        service_config = self._match_container_data_to_service(container_data)
-        return ContainerModel.from_docker_container(container_data, service_config)
+        try:
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(
+                f"restart --time {timeout} {container_name}"
+            )
+            
+            if exit_code == 0:
+                logger.info(f"Container {container_name} restarted successfully")
+                return True
+            else:
+                logger.error(f"Failed to restart container {container_name}: {stderr}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error restarting container {container_name}: {e}")
+            return False
     
-    def _match_container_to_service(self, container: ContainerModel) -> Optional[Dict[str, Any]]:
-        """Match a container to a managed service configuration.
+    def get_container_logs(self, container_name: str, lines: int = 100, follow: bool = False) -> List[str]:
+        """
+        Get container logs
         
         Args:
-            container: ContainerModel object
+            container_name: Name or ID of the container
+            lines: Number of log lines to retrieve
+            follow: Follow log output (not recommended for API calls)
             
         Returns:
-            Service configuration dict or None
+            List of log lines
         """
-        # Try exact name match first
-        for service_key, service_config in self.managed_services.items():
-            if service_config.get('container_name') == container.name:
-                return service_config
-        
-        # Try partial name match
-        for service_key, service_config in self.managed_services.items():
-            service_name = service_config.get('container_name', '')
-            if service_name and service_name in container.name:
-                return service_config
-        
-        # Try image name match
-        for service_key, service_config in self.managed_services.items():
-            if service_key.lower() in container.image.lower():
-                return service_config
-        
-        return None
+        return self.ssh.get_container_logs(container_name, lines)
     
-    def _match_container_data_to_service(self, container_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Match container data to managed service configuration.
+    def get_docker_system_info(self) -> Dict[str, Any]:
+        """
+        Get Docker system information
+        
+        Returns:
+            Dictionary containing Docker system info
+        """
+        return self.ssh.get_docker_info()
+    
+    def prune_containers(self, filters: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+        """
+        Remove stopped containers
         
         Args:
-            container_data: Container data from Docker API
+            filters: Optional filters for pruning
             
         Returns:
-            Service configuration dict or None
+            Dictionary with pruning results
         """
-        name = container_data.get('Name', '').lstrip('/')
-        image = container_data.get('Config', {}).get('Image', '')
-        
-        # Try exact name match first
-        for service_key, service_config in self.managed_services.items():
-            if service_config.get('container_name') == name:
-                return service_config
-        
-        # Try partial name match
-        for service_key, service_config in self.managed_services.items():
-            service_name = service_config.get('container_name', '')
-            if service_name and service_name in name:
-                return service_config
-        
-        # Try image name match
-        for service_key, service_config in self.managed_services.items():
-            if service_key.lower() in image.lower():
-                return service_config
-        
-        return None
+        try:
+            cmd_args = "container prune -f"
+            if filters:
+                filter_args = " ".join([f"--filter {k}={v}" for k, v in filters.items()])
+                cmd_args += f" {filter_args}"
+            
+            exit_code, stdout, stderr = self.ssh.execute_docker_command(cmd_args)
+            
+            result = {
+                'success': exit_code == 0,
+                'output': stdout,
+                'error': stderr
+            }
+            
+            if exit_code == 0:
+                logger.info("Container pruning completed successfully")
+            else:
+                logger.error(f"Container pruning failed: {stderr}")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error during container pruning: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'output': ''
+            }
     
-    def _parse_ports_string(self, ports_str: str) -> Dict[str, List[Dict[str, str]]]:
-        """Parse ports string from Docker ps output.
+    def check_container_health(self, container_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Check container health status
         
         Args:
-            ports_str: Ports string from Docker ps
+            container_name: Name or ID of the container
             
         Returns:
-            Ports dictionary in Docker inspect format
+            Dictionary with health check results or None
         """
-        ports = {}
-        if not ports_str:
-            return ports
-        
-        # Parse port mappings like "0.0.0.0:8080->80/tcp"
-        port_pattern = r'(?:(\d+\.\d+\.\d+\.\d+):)?(\d+)->(\d+)/(\w+)'
-        matches = re.findall(port_pattern, ports_str)
-        
-        for match in matches:
-            host_ip, host_port, container_port, protocol = match
-            container_key = f"{container_port}/{protocol}"
+        try:
+            container = self.get_container_details(container_name)
+            if not container:
+                return None
             
-            if container_key not in ports:
-                ports[container_key] = []
+            return {
+                'name': container.name,
+                'status': container.status.value,
+                'health_status': container.health_status,
+                'is_running': container.is_running,
+                'is_healthy': container.is_healthy,
+                'uptime': container.uptime
+            }
             
-            ports[container_key].append({
-                'HostIp': host_ip or '0.0.0.0',
-                'HostPort': host_port
-            })
-        
-        return ports
+        except Exception as e:
+            logger.error(f"Error checking health for container {container_name}: {e}")
+            return None

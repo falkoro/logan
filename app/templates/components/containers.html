@@ -1,0 +1,156 @@
+<!-- Containers Management -->
+<div class="space-y-6">
+    <!-- Header with Controls -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Container Management</h2>
+            <p class="text-gray-500 dark:text-gray-400">Monitor and manage Docker containers</p>
+        </div>
+        
+        <div class="flex items-center space-x-4">
+            <!-- Bulk Actions -->
+            <div class="relative">
+                <button id="bulk-actions-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors disabled:opacity-50" disabled>
+                    <i class="fas fa-list mr-2"></i>
+                    Bulk Actions
+                </button>
+                <div id="bulk-actions-menu" class="hidden absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
+                    <button onclick="bulkAction('start')" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg">
+                        <i class="fas fa-play text-green-600 mr-2"></i>Start Selected
+                    </button>
+                    <button onclick="bulkAction('stop')" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <i class="fas fa-stop text-red-600 mr-2"></i>Stop Selected
+                    </button>
+                    <button onclick="bulkAction('restart')" class="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg">
+                        <i class="fas fa-redo text-blue-600 mr-2"></i>Restart Selected
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Filters -->
+            <select id="status-filter" class="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm">
+                <option value="all">All Containers</option>
+                <option value="running">Running Only</option>
+                <option value="stopped">Stopped Only</option>
+            </select>
+            
+            <!-- Refresh -->
+            <button onclick="loadContainers()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Container Statistics -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                    <i class="fas fa-box text-blue-600 dark:text-blue-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total</p>
+                    <p id="total-containers" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                    <i class="fas fa-play text-green-600 dark:text-green-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Running</p>
+                    <p id="running-containers-count" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-red-100 dark:bg-red-900 rounded-lg">
+                    <i class="fas fa-stop text-red-600 dark:text-red-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Stopped</p>
+                    <p id="stopped-containers-count" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center">
+                <div class="p-2 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 dark:text-yellow-400"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Issues</p>
+                    <p id="unhealthy-containers-count" class="text-lg font-semibold text-gray-900 dark:text-white">-</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container Grid -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Container Grid</h3>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="select-all" class="rounded border-gray-300 dark:border-gray-600">
+                            <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">Select All</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="grid-view-btn" onclick="setViewMode('grid')" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-th mr-1"></i>Grid
+                        </button>
+                        <button id="list-view-btn" onclick="setViewMode('list')" class="px-3 py-1.5 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors">
+                            <i class="fas fa-list mr-1"></i>List
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Draggable Container Grid -->
+        <div id="containers-grid" class="p-6 min-h-96" data-view-mode="grid">
+            <!-- Loading state -->
+            <div id="loading-state" class="flex flex-col items-center justify-center h-64">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="mt-2 text-gray-500 dark:text-gray-400">Loading containers...</p>
+            </div>
+            
+            <!-- Empty state -->
+            <div id="empty-state" class="hidden flex flex-col items-center justify-center h-64">
+                <div class="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mb-4">
+                    <i class="fas fa-box text-2xl text-gray-400"></i>
+                </div>
+                <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-2">No containers found</h4>
+                <p class="text-gray-500 dark:text-gray-400 text-center">No Docker containers are currently running or available.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Container Detail Modal -->
+<div id="container-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-screen overflow-auto">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 id="modal-title" class="text-xl font-bold text-gray-900 dark:text-white">Container Details</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div id="modal-content" class="p-6">
+            <!-- Modal content will be populated by JavaScript -->
+        </div>
+    </div>
+</div>

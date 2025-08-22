@@ -1,36 +1,51 @@
 version: '3.8'
 
 services:
-  dashboard:
-    build: .
-    image: docker-dashboard:latest
+  docker-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: docker-dashboard
     restart: unless-stopped
     ports:
-      - "100:5000"
+      - "100:100"
     environment:
       - FLASK_ENV=production
-      - SSH_HOST=logan-GL502VS
-      - SSH_USERNAME=logan
-      - SSH_PORT=22
-      - HOST=0.0.0.0
-      - PORT=5000
-      - LOG_LEVEL=INFO
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=100
+      - REMOTE_HOST=logan@logan-GL502VS
+      - REMOTE_PORT=22
+      - GLANCES_HOST=logan-GL502VS
+      - GLANCES_PORT=61208
     volumes:
-      # Mount SSH key (create this path and add your SSH private key)
-      - ~/.ssh:/home/dashboard/.ssh:ro
-      # Mount logs directory
-      - ./logs:/app/logs
-      # Optional: Mount custom configuration
-      - ./.env:/app/.env:ro
+      - ./logs:/app/logs:rw
+      - /etc/ssh:/etc/ssh:ro
+      - ~/.ssh:/home/dashboarduser/.ssh:ro
     networks:
       - dashboard-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:100/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  # Optional: Include Glances container if not running on remote host
+  # glances:
+  #   image: nicolargo/glances:latest
+  #   container_name: glances-server
+  #   restart: unless-stopped
+  #   ports:
+  #     - "61208:61208"
+  #   environment:
+  #     - GLANCES_OPT=-w
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - /:/rootfs:ro
+  #     - /run:/run:ro
+  #     - /sys:/sys:ro
+  #   networks:
+  #     - dashboard-network
 
 networks:
   dashboard-network:
@@ -38,4 +53,3 @@ networks:
 
 volumes:
   dashboard-logs:
-    driver: local

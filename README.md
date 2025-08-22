@@ -1,296 +1,323 @@
-# Logan Dashboard 🚀
+# Docker Dashboard
 
-A modern, responsive Docker management dashboard optimized for 1080p displays. Logan Dashboard provides real-time monitoring and control of Docker containers on remote servers via SSH.
+A modern, responsive web dashboard for managing Docker containers on remote hosts with real-time monitoring capabilities.
 
-![Logan Dashboard](https://img.shields.io/badge/Status-Active-brightgreen) ![Docker](https://img.shields.io/badge/Docker-Ready-blue) ![Python](https://img.shields.io/badge/Python-3.11+-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![Dashboard Preview](https://img.shields.io/badge/Status-Ready%20for%20Testing-green)
+![Python](https://img.shields.io/badge/Python-3.11+-blue)
+![Flask](https://img.shields.io/badge/Flask-3.0+-red)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 
-## ✨ Features
+## Features
 
-### 🖥️ 1080p Optimized Interface
-- **Perfect Screen Fit**: Designed specifically for 1920×1080 displays
-- **Compact Layout**: No scrolling needed, all information at a glance
-- **Responsive Design**: Adapts to different screen sizes
+### 🚀 Container Management
+- **Real-time monitoring** of Docker containers
+- **Remote container control** via SSH (start, stop, restart)
+- **Bulk operations** for multiple containers
+- **Container logs** viewing with search and filtering
+- **Resource usage tracking** (CPU, memory, network)
 
-### 📊 Real-time Monitoring
-- **System Metrics**: Live CPU, Memory, and Disk usage charts
-- **Container Status**: Real-time Docker container monitoring
-- **Service Health**: Monitor specific services on designated ports
-- **Activity Logging**: Track all operations and system events
+### 📊 System Monitoring
+- **System metrics** via Glances API integration
+- **Real-time charts** for CPU, memory, and network usage
+- **Process monitoring** with top processes display
+- **System information** overview
 
-### 🎮 Container Management
-- **Start/Stop/Restart**: Full container lifecycle management
-- **Bulk Operations**: Manage multiple containers simultaneously
-- **Service Discovery**: Automatic detection of running services
-- **Port Management**: Monitor services on ports 100-110 + Plex (32400)
+### 🎯 Service Management
+- **Predefined service management** for common applications:
+  - SABnzbd, qBittorrent, Sonarr, Radarr, Jackett, Plex
+  - Portainer, Netdata, Heimdall, Glances
+- **Service health monitoring** with status indicators
+- **Quick access** to service web interfaces
 
-### 🔐 Secure Remote Access
-- **SSH Integration**: Secure connection to remote Docker hosts
-- **Key-based Authentication**: Support for SSH key authentication
-- **Encrypted Communication**: All data transfer secured via SSH
+### 💻 Modern Interface
+- **Responsive design** built with Tailwind CSS
+- **Dark/Light theme** support
+- **WebSocket integration** for real-time updates
+- **Interactive charts** with Chart.js
+- **Mobile-friendly** interface
 
-## 🏗️ Architecture
-
-```
-Logan Dashboard/
-├── app/                    # Flask application
-│   ├── __init__.py        # Application factory
-│   ├── config.py          # Configuration management
-│   ├── models/            # Data models
-│   ├── services/          # Business logic (SSH, Docker, Monitoring)
-│   ├── api/              # REST API endpoints
-│   └── templates/        # HTML templates
-├── static/               # CSS, JavaScript, images
-├── tests/               # Test suite
-├── docker-compose.yml   # Production deployment
-├── Dockerfile          # Container definition
-└── requirements.txt    # Python dependencies
-```
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Python 3.11+ (for local development)
-- SSH access to target server
 
-### 1. Clone the Repository
+- Python 3.11+
+- SSH access to remote Docker host
+- Glances running on remote host (optional but recommended)
+
+### Installation
+
+1. **Clone the repository**
 ```bash
-git clone https://github.com/falkoro/logan.git
-cd logan
+git clone <repository-url>
+cd dashboard
 ```
 
-### 2. Configure Environment
+2. **Create virtual environment**
 ```bash
-# Copy example environment file
-cp .env.example .env
-
-# Edit configuration
-nano .env
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### 3. Deploy with Docker
+3. **Install dependencies**
 ```bash
-# Build and start the dashboard
-docker-compose up -d
-
-# Check status
-docker-compose ps
-```
-
-### 4. Access Dashboard
-Open your browser and navigate to:
-- **Local**: http://localhost:100
-- **Remote**: http://YOUR_SERVER_IP:100
-
-## ⚙️ Configuration
-
-### Environment Variables
-```env
-# Server Configuration
-SSH_HOST=localhost
-SSH_USERNAME=your_username
-SSH_PORT=22
-
-# Flask Configuration
-FLASK_ENV=production
-SECRET_KEY=your_secret_key_here
-
-# Dashboard Settings
-AUTO_REFRESH=true
-REFRESH_INTERVAL=30
-```
-
-### Managed Services
-Edit `app/config.py` to configure monitored services:
-```python
-MANAGED_SERVICES = {
-    'portainer': {
-        'name': 'Portainer',
-        'port': 9000,
-        'container_name': 'portainer'
-    },
-    'plex': {
-        'name': 'Plex Media Server',
-        'port': 32400,
-        'container_name': 'plex'
-    }
-    # Add your services here...
-}
-```
-
-## 🔧 Development
-
-### Local Development Setup
-```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-# or
-.venv\Scripts\activate     # Windows
-
-# Install dependencies
 pip install -r requirements.txt
+```
 
-# Run development server
+4. **Configure environment**
+```bash
+cp .env.example .env
+# Edit .env with your settings
+```
+
+5. **Run the application**
+```bash
 python run.py
 ```
 
-### Running Tests
+The dashboard will be available at `http://localhost:100`
+
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=app --cov-report=html
-```
-
-### Building Docker Image
-```bash
-# Build image
-docker build -t logan-dashboard:latest .
-
-# Run container
-docker run -d -p 100:5000 --name logan-dashboard logan-dashboard:latest
-```
-
-## 🐳 Docker Deployment
-
-### Production Deployment
-```bash
-# Start services
+# Build and run
 docker-compose up -d
 
 # View logs
 docker-compose logs -f
 
-# Stop services
+# Stop
 docker-compose down
 ```
 
-### Health Checks
-The dashboard includes built-in health checks:
-- **Health Endpoint**: `/health`
-- **Status Checks**: System metrics, SSH connectivity, Docker daemon
-- **Container Health**: Automatic restart on failure
+### Using Docker directly
 
-## 📱 API Reference
+```bash
+# Build image
+docker build -t docker-dashboard .
 
-### System Endpoints
-- `GET /api/system/metrics` - System resource usage
-- `GET /api/system/health` - Overall system health
+# Run container
+docker run -d \
+  --name docker-dashboard \
+  -p 100:100 \
+  -e REMOTE_HOST=logan@logan-GL502VS \
+  -e GLANCES_HOST=logan-GL502VS \
+  -v ~/.ssh:/home/dashboarduser/.ssh:ro \
+  docker-dashboard
+```
 
-### Container Endpoints
-- `GET /api/containers` - List all containers
-- `POST /api/containers/{id}/start` - Start container
-- `POST /api/containers/{id}/stop` - Stop container
-- `POST /api/containers/{id}/restart` - Restart container
+## Configuration
 
-### Service Endpoints
-- `GET /api/services` - List managed services
-- `GET /api/services/{service}/status` - Service status
+### Environment Variables
 
-## 🎨 Customization
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FLASK_HOST` | `0.0.0.0` | Host to bind the Flask application |
+| `FLASK_PORT` | `100` | Port to run the application |
+| `FLASK_ENV` | `development` | Flask environment (development/production) |
+| `REMOTE_HOST` | `logan@logan-GL502VS` | SSH connection string for Docker host |
+| `REMOTE_PORT` | `22` | SSH port for remote host |
+| `GLANCES_HOST` | `logan-GL502VS` | Hostname for Glances API |
+| `GLANCES_PORT` | `61208` | Port for Glances API |
 
-### Themes and Styling
-- CSS files located in `app/static/css/`
-- Main styles: `logan-dashboard.css`
-- Colors defined in CSS custom properties
+### SSH Configuration
 
-### Adding New Services
-1. Edit `app/config.py`
-2. Add service configuration to `MANAGED_SERVICES`
-3. Restart the dashboard
+Ensure you have SSH key-based authentication set up:
 
-### Custom Monitoring
-Extend the `MonitoringService` class in `app/services/monitoring_service.py`
+```bash
+# Generate SSH key if you don't have one
+ssh-keygen -t ed25519 -C "your_email@example.com"
 
-## 🛠️ Troubleshooting
+# Copy public key to remote host
+ssh-copy-id logan@logan-GL502VS
+
+# Test connection
+ssh logan@logan-GL502VS docker ps
+```
+
+### Glances Setup (Remote Host)
+
+Install and run Glances on your remote Docker host:
+
+```bash
+# Install Glances
+pip install glances
+
+# Run Glances web server
+glances -w --port 61208
+
+# Or run as Docker container
+docker run -d --restart="always" \
+  -p 61208:61208 \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  --name glances \
+  nicolargo/glances:latest -w
+```
+
+## Project Structure
+
+```
+dashboard/
+├── app/                      # Application package
+│   ├── __init__.py          # Flask app factory
+│   ├── config/              # Configuration modules
+│   ├── models/              # Data models
+│   ├── services/            # Business logic services
+│   ├── api/                 # REST API endpoints
+│   ├── templates/           # Jinja2 templates
+│   └── static/              # Static assets (CSS, JS)
+├── tests/                   # Test suite
+├── run.py                   # Application entry point
+├── requirements.txt         # Python dependencies
+├── Dockerfile              # Docker build configuration
+├── docker-compose.yml      # Docker Compose configuration
+└── README.md               # This file
+```
+
+## API Endpoints
+
+### Containers
+- `GET /api/containers/` - List all containers
+- `GET /api/containers/<id>` - Get container details
+- `POST /api/containers/<id>/start` - Start container
+- `POST /api/containers/<id>/stop` - Stop container
+- `POST /api/containers/<id>/restart` - Restart container
+- `GET /api/containers/<id>/logs` - Get container logs
+- `POST /api/containers/bulk/start` - Start multiple containers
+- `POST /api/containers/bulk/stop` - Stop multiple containers
+- `POST /api/containers/bulk/restart` - Restart multiple containers
+
+### System
+- `GET /api/system/info` - Get system information
+- `GET /api/system/metrics` - Get system metrics
+- `GET /api/system/processes` - Get running processes
+
+### Health
+- `GET /api/health` - Application health check
+
+## Development
+
+### Setting up Development Environment
+
+1. **Install development dependencies**
+```bash
+pip install -r requirements-dev.txt
+```
+
+2. **Run tests**
+```bash
+pytest
+```
+
+3. **Code formatting**
+```bash
+black app/ tests/
+flake8 app/ tests/
+```
+
+4. **Run with debug mode**
+```bash
+export FLASK_DEBUG=True
+python run.py
+```
+
+### Adding New Features
+
+1. **Models** - Add data models in `app/models/`
+2. **Services** - Add business logic in `app/services/`
+3. **API** - Add endpoints in `app/api/`
+4. **Frontend** - Add templates in `app/templates/` and JS in `app/static/js/`
+5. **Tests** - Add tests in `tests/`
+
+## Monitoring Integration
+
+### Supported Services
+
+The dashboard automatically detects and provides special handling for these services:
+
+- **SABnzbd** - Usenet downloader
+- **qBittorrent** - BitTorrent client
+- **Sonarr** - TV series management
+- **Radarr** - Movie management
+- **Jackett** - Indexer proxy
+- **Plex** - Media server
+- **Portainer** - Docker management UI
+- **Netdata** - System monitoring
+- **Heimdall** - Application dashboard
+- **Glances** - System monitoring
+
+### Adding Custom Services
+
+To add support for additional services, modify the `TARGET_SERVICES` list in `app/static/js/services.js` and add appropriate service configuration in the `getServiceConfig()` function.
+
+## Troubleshooting
 
 ### Common Issues
 
-**Dashboard won't start**
-```bash
-# Check logs
-docker-compose logs dashboard
+**1. SSH Connection Failed**
+- Verify SSH key authentication is set up
+- Check remote host is accessible: `ssh logan@logan-GL502VS`
+- Ensure user has Docker permissions: `sudo usermod -aG docker logan`
 
-# Verify SSH connectivity
-ssh username@hostname
-```
+**2. Glances API Unavailable**
+- Check if Glances is running on remote host: `curl http://logan-GL502VS:61208/api/3/system`
+- Verify port 61208 is accessible
+- Check firewall settings on remote host
 
-**Services not detected**
-```bash
-# Check Docker daemon
-docker ps
+**3. Container Operations Fail**
+- Verify Docker daemon is running on remote host
+- Check user permissions for Docker commands
+- Review application logs: `docker-compose logs -f`
 
-# Verify SSH permissions
-ssh -v username@hostname
-```
+**4. WebSocket Connection Issues**
+- Check browser console for WebSocket errors
+- Verify no proxy/firewall blocking WebSocket connections
+- Try refreshing the page
 
-**Port conflicts**
-```bash
-# Check port usage
-netstat -tlnp | grep :100
+### Logging
 
-# Modify port in docker-compose.yml
-```
+Application logs are available in:
+- Console output when running directly
+- `logs/` directory when running with Docker
+- Docker logs: `docker-compose logs -f docker-dashboard`
 
-## 📊 Monitoring & Metrics
+## Security Considerations
 
-Logan Dashboard tracks:
-- **System Resources**: CPU, Memory, Disk usage
-- **Container Metrics**: Status, resource usage, logs
-- **Network Activity**: Port status, connectivity
-- **Application Performance**: Response times, error rates
+- **SSH Keys**: Use key-based authentication instead of passwords
+- **Firewall**: Limit access to dashboard port (100) to trusted networks
+- **HTTPS**: Use a reverse proxy (nginx, traefik) with SSL certificates
+- **User Access**: Run application as non-root user in Docker
+- **Environment Variables**: Never commit sensitive values to version control
 
-## 🔐 Security
-
-### Best Practices
-- Use SSH key authentication
-- Restrict network access to dashboard port
-- Regular updates of base images
-- Monitor access logs
-
-### Security Features
-- **Encrypted SSH connections**
-- **No password storage**
-- **Container isolation**
-- **Read-only Docker socket access**
-
-## 🚧 Roadmap
-
-- [ ] Multi-server support
-- [ ] Advanced alerting system
-- [ ] Mobile app companion
-- [ ] Plugin architecture
-- [ ] Kubernetes integration
-- [ ] Performance analytics
-
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙋‍♂️ Support
+## Acknowledgments
 
-- **GitHub Issues**: [Report bugs or request features](https://github.com/falkoro/logan/issues)
-- **Discussions**: [Community support and questions](https://github.com/falkoro/logan/discussions)
+- **Flask** - Web framework
+- **Tailwind CSS** - CSS framework
+- **Chart.js** - Charting library
+- **Socket.IO** - Real-time communication
+- **Glances** - System monitoring
+- **Docker** - Containerization platform
 
-## 🎯 Acknowledgments
+## Support
 
-- Flask framework for the web application
-- Chart.js for beautiful metrics visualization
-- Docker for containerization
-- The open-source community for inspiration
+If you encounter any issues or have questions, please:
+1. Check the [Troubleshooting](#troubleshooting) section
+2. Search existing [issues](https://github.com/your-repo/issues)
+3. Create a new issue with detailed information about your problem
 
 ---
 
-**Logan Dashboard** - Docker management made beautiful and efficient! 🚀
-
-Made with ❤️ by [@falkoro](https://github.com/falkoro)
+**Made with ❤️ for Docker container management**

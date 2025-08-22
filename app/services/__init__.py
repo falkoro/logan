@@ -1,10 +1,10 @@
-"""Services package initialization."""
-from .ssh_service import SSHService
-from .docker_service import DockerService
-from .monitoring_service import MonitoringService
+# Services Module
+from .ssh_service import SSHService, SSHConnectionError
+from .docker_service import DockerService, DockerServiceError
+from .monitoring_service import MonitoringService, MonitoringServiceError
 
 __all__ = [
-    'SSHService',
-    'DockerService',
-    'MonitoringService'
+    'SSHService', 'SSHConnectionError',
+    'DockerService', 'DockerServiceError', 
+    'MonitoringService', 'MonitoringServiceError'
 ]

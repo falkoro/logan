@@ -1,4 +1,8 @@
-# Logan Dashboard - .gitignore
+# Docker Dashboard
+
+# Logs directory
+logs/
+*.log
 
 # Python
 __pycache__/
@@ -18,14 +22,12 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Virtual Environment
+# Virtual environments
 .env
 .venv
 env/
@@ -34,55 +36,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Environment Variables & Secrets
-.env
-.env.local
-.env.production
-.env.development
-*.env
-config.ini
-secrets.json
-credentials.json
-
-# SSH Keys & Certificates
-*.pem
-*.key
-*.crt
-*.p12
-id_rsa*
-id_ed25519*
-known_hosts
-authorized_keys
-
-# Docker
-.docker/
-docker-compose.override.yml
-
-# IDE & Editor
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-log/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Cache
-.cache/
-.pytest_cache/
-.mypy_cache/
-.coverage
-htmlcov/
 
 # OS
 .DS_Store
@@ -93,19 +52,40 @@ htmlcov/
 ehthumbs.db
 Thumbs.db
 
+# SSH keys (security)
+*.pem
+*.key
+id_rsa*
+id_ecdsa*
+id_ed25519*
+
+# Configuration files with sensitive data
+.env.local
+.env.production
+config/secrets.py
+
+# Test coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
 # Backup files
-*.bak
 *.backup
-*.old
+*.bak
+*.tmp
 
-# Azure
-.azure/
-
-# Local test files
-test_local.py
-local_test.py
-
-# Personal notes
-notes.txt
-todo.txt
-NOTES.md
+# Docker
+.dockerignore

@@ -1,281 +1,418 @@
-"""API endpoints for container management."""
+"""
+Container API endpoints
+"""
 import logging
-from flask import Blueprint, jsonify, request
-from typing import Dict, Any, List
-
-from ..services import DockerService
-from ..models.container import ContainerModel
+from flask import Blueprint, request, jsonify, current_app
+from typing import Dict, Any
+from app.services import DockerService, DockerServiceError
 
 logger = logging.getLogger(__name__)
 
-containers_bp = Blueprint('containers', __name__)
+containers_bp = Blueprint('containers', __name__, url_prefix='/api/containers')
 
+def get_docker_service() -> DockerService:
+    """Get Docker service instance from app context"""
+    return current_app.docker_service
 
-def init_containers_api(docker_service: DockerService):
-    """Initialize the containers API with services."""
-    containers_bp.docker_service = docker_service
-
-
-@containers_bp.route('/api/containers', methods=['GET'])
+@containers_bp.route('/', methods=['GET'])
 def list_containers():
-    """List all containers."""
+    """List all containers"""
     try:
-        all_containers = request.args.get('all', 'true').lower() == 'true'
-        containers = containers_bp.docker_service.list_containers(all_containers)
+        include_stopped = request.args.get('include_stopped', 'true').lower() == 'true'
+        quick = request.args.get('quick', 'false').lower() == 'true'  # Quick mode for basic info only
+        docker_service = get_docker_service()
+        containers = docker_service.list_containers(include_stopped=include_stopped, quick_mode=quick)
         
         return jsonify({
-            'status': 'success',
+            'success': True,
             'data': [container.to_dict() for container in containers],
             'count': len(containers)
         })
         
-    except Exception as e:
-        logger.error(f"Error listing containers: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error listing containers: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error listing containers: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/managed', methods=['GET'])
-def list_managed_containers():
-    """List managed service containers only."""
+@containers_bp.route('/overview', methods=['GET'])
+def containers_overview():
+    """Get quick overview of containers without detailed stats"""
     try:
-        containers = containers_bp.docker_service.get_managed_services_status()
+        docker_service = get_docker_service()
+        containers = docker_service.list_containers(include_stopped=True, quick_mode=True)
+        
+        # Calculate summary stats
+        total = len(containers)
+        running = sum(1 for c in containers if c.is_running)
+        stopped = total - running
         
         return jsonify({
-            'status': 'success',
-            'data': [container.to_dict() for container in containers],
-            'count': len(containers)
+            'success': True,
+            'data': {
+                'total': total,
+                'running': running,
+                'stopped': stopped,
+                'containers': [container.to_dict() for container in containers]
+            }
         })
         
-    except Exception as e:
-        logger.error(f"Error listing managed containers: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error getting containers overview: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting containers overview: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/<container_id_or_name>', methods=['GET'])
-def get_container_details(container_id_or_name: str):
-    """Get detailed information about a specific container."""
+@containers_bp.route('/<container_name>', methods=['GET'])
+def get_container(container_name: str):
+    """Get details for a specific container"""
     try:
-        container = containers_bp.docker_service.get_container_details(container_id_or_name)
+        docker_service = get_docker_service()
+        container = docker_service.get_container_details(container_name)
         
         if container is None:
             return jsonify({
-                'status': 'error',
-                'message': f'Container {container_id_or_name} not found'
+                'success': False,
+                'error': f'Container {container_name} not found'
             }), 404
         
         return jsonify({
-            'status': 'success',
+            'success': True,
             'data': container.to_dict()
         })
         
-    except Exception as e:
-        logger.error(f"Error getting container details: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error getting container {container_name}: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting container {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/<container_id_or_name>/start', methods=['POST'])
-def start_container(container_id_or_name: str):
-    """Start a container."""
+@containers_bp.route('/<container_name>/start', methods=['POST'])
+def start_container(container_name: str):
+    """Start a container"""
     try:
-        success = containers_bp.docker_service.start_container(container_id_or_name)
+        docker_service = get_docker_service()
+        success = docker_service.start_container(container_name)
         
         if success:
             return jsonify({
-                'status': 'success',
-                'message': f'Container {container_id_or_name} started successfully'
+                'success': True,
+                'message': f'Container {container_name} started successfully'
             })
         else:
             return jsonify({
-                'status': 'error',
-                'message': f'Failed to start container {container_id_or_name}'
+                'success': False,
+                'error': f'Failed to start container {container_name}'
             }), 500
             
-    except Exception as e:
-        logger.error(f"Error starting container: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error starting container {container_name}: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error starting container {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/<container_id_or_name>/stop', methods=['POST'])
-def stop_container(container_id_or_name: str):
-    """Stop a container."""
+@containers_bp.route('/<container_name>/stop', methods=['POST'])
+def stop_container(container_name: str):
+    """Stop a container"""
     try:
         timeout = request.json.get('timeout', 10) if request.is_json else 10
-        success = containers_bp.docker_service.stop_container(container_id_or_name, timeout)
+        docker_service = get_docker_service()
+        success = docker_service.stop_container(container_name, timeout=timeout)
         
         if success:
             return jsonify({
-                'status': 'success',
-                'message': f'Container {container_id_or_name} stopped successfully'
+                'success': True,
+                'message': f'Container {container_name} stopped successfully'
             })
         else:
             return jsonify({
-                'status': 'error',
-                'message': f'Failed to stop container {container_id_or_name}'
+                'success': False,
+                'error': f'Failed to stop container {container_name}'
             }), 500
             
-    except Exception as e:
-        logger.error(f"Error stopping container: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error stopping container {container_name}: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error stopping container {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/<container_id_or_name>/restart', methods=['POST'])
-def restart_container(container_id_or_name: str):
-    """Restart a container."""
+@containers_bp.route('/<container_name>/restart', methods=['POST'])
+def restart_container(container_name: str):
+    """Restart a container"""
     try:
         timeout = request.json.get('timeout', 10) if request.is_json else 10
-        success = containers_bp.docker_service.restart_container(container_id_or_name, timeout)
+        docker_service = get_docker_service()
+        success = docker_service.restart_container(container_name, timeout=timeout)
         
         if success:
             return jsonify({
-                'status': 'success',
-                'message': f'Container {container_id_or_name} restarted successfully'
+                'success': True,
+                'message': f'Container {container_name} restarted successfully'
             })
         else:
             return jsonify({
-                'status': 'error',
-                'message': f'Failed to restart container {container_id_or_name}'
+                'success': False,
+                'error': f'Failed to restart container {container_name}'
             }), 500
             
-    except Exception as e:
-        logger.error(f"Error restarting container: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error restarting container {container_name}: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error restarting container {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/<container_id_or_name>/logs', methods=['GET'])
-def get_container_logs(container_id_or_name: str):
-    """Get container logs."""
+@containers_bp.route('/<container_name>/logs', methods=['GET'])
+def get_container_logs(container_name: str):
+    """Get container logs"""
     try:
-        tail = request.args.get('tail', 100, type=int)
-        since = request.args.get('since')
-        
-        logs = containers_bp.docker_service.get_container_logs(
-            container_id_or_name, tail=tail, since=since
-        )
+        lines = int(request.args.get('lines', 100))
+        docker_service = get_docker_service()
+        logs = docker_service.get_container_logs(container_name, lines=lines)
         
         return jsonify({
-            'status': 'success',
+            'success': True,
             'data': {
-                'container': container_id_or_name,
+                'container': container_name,
                 'logs': logs,
-                'lines': len(logs.splitlines()) if logs else 0
+                'lines': len(logs)
             }
         })
         
-    except Exception as e:
-        logger.error(f"Error getting container logs: {e}")
+    except ValueError:
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': 'Invalid lines parameter, must be integer'
+        }), 400
+    except DockerServiceError as e:
+        logger.error(f"Docker service error getting logs for {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting logs for {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@containers_bp.route('/api/containers/<container_id_or_name>/stats', methods=['GET'])
-def get_container_stats(container_id_or_name: str):
-    """Get container resource usage statistics."""
+@containers_bp.route('/<container_name>/stats', methods=['GET'])
+def get_container_stats(container_name: str):
+    """Get container resource statistics"""
     try:
-        stats = containers_bp.docker_service.get_container_stats(container_id_or_name)
+        docker_service = get_docker_service()
+        stats = docker_service.get_container_stats(container_name)
+        
+        if stats is None:
+            return jsonify({
+                'success': False,
+                'error': f'Stats not available for container {container_name}'
+            }), 404
         
         return jsonify({
-            'status': 'success',
+            'success': True,
             'data': {
-                'container': container_id_or_name,
-                'stats': stats
+                'container': container_name,
+                'cpu_percent': stats.cpu_percent,
+                'memory_usage': stats.memory_usage,
+                'memory_limit': stats.memory_limit,
+                'memory_percent': stats.memory_percent,
+                'memory_usage_mb': stats.memory_usage / (1024 * 1024),
+                'network_rx': stats.network_rx,
+                'network_tx': stats.network_tx,
+                'timestamp': stats.timestamp.isoformat()
             }
         })
         
-    except Exception as e:
-        logger.error(f"Error getting container stats: {e}")
+    except DockerServiceError as e:
+        logger.error(f"Docker service error getting stats for {container_name}: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting stats for {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
+@containers_bp.route('/<container_name>/health', methods=['GET'])
+def check_container_health(container_name: str):
+    """Check container health status"""
+    try:
+        docker_service = get_docker_service()
+        health = docker_service.check_container_health(container_name)
+        
+        if health is None:
+            return jsonify({
+                'success': False,
+                'error': f'Container {container_name} not found'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'data': health
+        })
+        
+    except DockerServiceError as e:
+        logger.error(f"Docker service error checking health for {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error checking health for {container_name}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
 
-@containers_bp.route('/api/containers/bulk/action', methods=['POST'])
+@containers_bp.route('/bulk/action', methods=['POST'])
 def bulk_container_action():
-    """Perform bulk actions on multiple containers."""
+    """Perform bulk action on multiple containers"""
     try:
         if not request.is_json:
             return jsonify({
-                'status': 'error',
-                'message': 'Request must be JSON'
+                'success': False,
+                'error': 'Request must be JSON'
             }), 400
         
-        data = request.json
+        data = request.get_json()
         action = data.get('action')
         container_names = data.get('containers', [])
         timeout = data.get('timeout', 10)
         
-        if not action or not container_names:
+        if action not in ['start', 'stop', 'restart']:
             return jsonify({
-                'status': 'error',
-                'message': 'Action and containers list are required'
+                'success': False,
+                'error': 'Invalid action. Must be one of: start, stop, restart'
             }), 400
         
-        valid_actions = ['start', 'stop', 'restart']
-        if action not in valid_actions:
+        if not container_names:
             return jsonify({
-                'status': 'error',
-                'message': f'Invalid action. Must be one of: {valid_actions}'
+                'success': False,
+                'error': 'No containers specified'
             }), 400
         
+        docker_service = get_docker_service()
         results = {}
+        
         for container_name in container_names:
             try:
                 if action == 'start':
-                    success = containers_bp.docker_service.start_container(container_name)
+                    success = docker_service.start_container(container_name)
                 elif action == 'stop':
-                    success = containers_bp.docker_service.stop_container(container_name, timeout)
+                    success = docker_service.stop_container(container_name, timeout=timeout)
                 elif action == 'restart':
-                    success = containers_bp.docker_service.restart_container(container_name, timeout)
+                    success = docker_service.restart_container(container_name, timeout=timeout)
                 
                 results[container_name] = {
                     'success': success,
                     'message': f'Container {action}ed successfully' if success else f'Failed to {action} container'
                 }
-                
             except Exception as e:
                 results[container_name] = {
                     'success': False,
-                    'message': str(e)
+                    'error': str(e)
                 }
         
-        # Count successes and failures
-        successes = sum(1 for result in results.values() if result['success'])
-        failures = len(results) - successes
+        overall_success = all(result['success'] for result in results.values())
         
         return jsonify({
-            'status': 'success' if failures == 0 else 'partial',
-            'message': f'Action {action} completed. {successes} successful, {failures} failed',
-            'data': results,
-            'summary': {
-                'total': len(container_names),
-                'successful': successes,
-                'failed': failures
-            }
+            'success': overall_success,
+            'results': results,
+            'action': action,
+            'total': len(container_names),
+            'successful': sum(1 for r in results.values() if r['success'])
         })
         
     except Exception as e:
-        logger.error(f"Error performing bulk container action: {e}")
+        logger.error(f"Unexpected error in bulk container action: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@containers_bp.route('/prune', methods=['POST'])
+def prune_containers():
+    """Remove stopped containers"""
+    try:
+        filters = request.json.get('filters', {}) if request.is_json else {}
+        docker_service = get_docker_service()
+        result = docker_service.prune_containers(filters=filters)
+        
+        return jsonify({
+            'success': result['success'],
+            'message': 'Container pruning completed' if result['success'] else 'Container pruning failed',
+            'output': result.get('output', ''),
+            'error': result.get('error', '')
+        })
+        
+    except Exception as e:
+        logger.error(f"Unexpected error pruning containers: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@containers_bp.route('/docker/info', methods=['GET'])
+def get_docker_info():
+    """Get Docker system information"""
+    try:
+        docker_service = get_docker_service()
+        info = docker_service.get_docker_system_info()
+        
+        return jsonify({
+            'success': True,
+            'data': info
+        })
+        
+    except Exception as e:
+        logger.error(f"Unexpected error getting Docker info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500

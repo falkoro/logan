@@ -1,205 +1,445 @@
-"""API endpoints for system monitoring."""
+"""
+System monitoring API endpoints
+"""
 import logging
-from flask import Blueprint, jsonify, request
-
-from ..services import MonitoringService
+from flask import Blueprint, request, jsonify, current_app
+from app.services import MonitoringService, MonitoringServiceError
 
 logger = logging.getLogger(__name__)
 
-system_bp = Blueprint('system', __name__)
+system_bp = Blueprint('system', __name__, url_prefix='/api/system')
 
+def get_monitoring_service() -> MonitoringService:
+    """Get Monitoring service instance from app context"""
+    return current_app.monitoring_service
 
-def init_system_api(monitoring_service: MonitoringService):
-    """Initialize the system API with services."""
-    system_bp.monitoring_service = monitoring_service
-
-
-@system_bp.route('/api/system/metrics', methods=['GET'])
-def get_system_metrics():
-    """Get current system metrics."""
-    try:
-        use_cache = request.args.get('cache', 'true').lower() == 'true'
-        metrics = system_bp.monitoring_service.get_system_metrics(use_cache)
-        
-        if metrics is None:
-            return jsonify({
-                'status': 'error',
-                'message': 'Failed to retrieve system metrics'
-            }), 500
-        
-        return jsonify({
-            'status': 'success',
-            'data': metrics.to_dict()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting system metrics: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-
-@system_bp.route('/api/system/metrics/history', methods=['GET'])
-def get_historical_metrics():
-    """Get historical system metrics."""
-    try:
-        hours = request.args.get('hours', 24, type=int)
-        if hours < 1 or hours > 168:  # Max 1 week
-            hours = 24
-        
-        metrics = system_bp.monitoring_service.get_historical_metrics(hours)
-        
-        return jsonify({
-            'status': 'success',
-            'data': [m.to_dict() for m in metrics],
-            'count': len(metrics),
-            'hours': hours
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting historical metrics: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-
-@system_bp.route('/api/system/health', methods=['GET'])
-def get_service_health():
-    """Get health status of all managed services."""
-    try:
-        use_cache = request.args.get('cache', 'true').lower() == 'true'
-        health_status = system_bp.monitoring_service.get_service_health_status(use_cache)
-        
-        return jsonify({
-            'status': 'success',
-            'data': [health.to_dict() for health in health_status],
-            'count': len(health_status)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting service health: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-
-@system_bp.route('/api/system/info', methods=['GET'])
+@system_bp.route('/info', methods=['GET'])
 def get_system_info():
-    """Get general system information."""
+    """Get comprehensive system information"""
     try:
-        system_info = system_bp.monitoring_service.get_system_info()
+        monitoring_service = get_monitoring_service()
+        system_info = monitoring_service.get_system_info()
         
         if system_info is None:
             return jsonify({
-                'status': 'error',
-                'message': 'Failed to retrieve system information'
+                'success': False,
+                'error': 'Failed to retrieve system information'
             }), 500
         
         return jsonify({
-            'status': 'success',
+            'success': True,
             'data': system_info.to_dict()
         })
         
-    except Exception as e:
-        logger.error(f"Error getting system info: {e}")
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting system info: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting system info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@system_bp.route('/api/system/network', methods=['GET'])
-def get_network_info():
-    """Get network interface information."""
+@system_bp.route('/cpu', methods=['GET'])
+def get_cpu_info():
+    """Get CPU information and statistics"""
     try:
-        network_info = system_bp.monitoring_service.get_network_info()
+        monitoring_service = get_monitoring_service()
+        cpu_info = monitoring_service.get_cpu_info()
+        
+        if cpu_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve CPU information'
+            }), 500
         
         return jsonify({
-            'status': 'success',
-            'data': [net.to_dict() for net in network_info],
-            'count': len(network_info)
+            'success': True,
+            'data': cpu_info
         })
         
-    except Exception as e:
-        logger.error(f"Error getting network info: {e}")
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting CPU info: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting CPU info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
         }), 500
 
-
-@system_bp.route('/api/system/status', methods=['GET'])
-def get_system_status():
-    """Get overall system status summary."""
+@system_bp.route('/memory', methods=['GET'])
+def get_memory_info():
+    """Get memory information and statistics"""
     try:
-        # Get current metrics
-        metrics = system_bp.monitoring_service.get_system_metrics(use_cache=True)
+        monitoring_service = get_monitoring_service()
+        memory_info = monitoring_service.get_memory_info()
         
-        # Get service health
-        health_status = system_bp.monitoring_service.get_service_health_status(use_cache=True)
-        
-        # Calculate overall health
-        total_services = len(health_status)
-        healthy_services = sum(1 for h in health_status if h.is_healthy)
-        
-        # Determine overall status
-        if total_services == 0:
-            overall_status = 'unknown'
-        elif healthy_services == total_services:
-            overall_status = 'healthy'
-        elif healthy_services >= total_services * 0.8:  # 80% threshold
-            overall_status = 'warning'
-        else:
-            overall_status = 'critical'
-        
-        # System resource status
-        resource_status = 'healthy'
-        if metrics:
-            if metrics.cpu_percent > 90 or metrics.memory_percent > 90 or metrics.disk_percent > 90:
-                resource_status = 'critical'
-            elif metrics.cpu_percent > 75 or metrics.memory_percent > 75 or metrics.disk_percent > 80:
-                resource_status = 'warning'
+        if memory_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve memory information'
+            }), 500
         
         return jsonify({
-            'status': 'success',
+            'success': True,
+            'data': memory_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting memory info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting memory info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/disk', methods=['GET'])
+def get_disk_info():
+    """Get disk information and statistics"""
+    try:
+        monitoring_service = get_monitoring_service()
+        disk_info = monitoring_service.get_disk_info()
+        
+        if disk_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve disk information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': disk_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting disk info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting disk info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/network', methods=['GET'])
+def get_network_info():
+    """Get network interface information and statistics"""
+    try:
+        monitoring_service = get_monitoring_service()
+        network_info = monitoring_service.get_network_info()
+        
+        if network_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve network information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': network_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting network info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting network info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/processes', methods=['GET'])
+def get_process_info():
+    """Get running process information"""
+    try:
+        monitoring_service = get_monitoring_service()
+        process_info = monitoring_service.get_process_info()
+        
+        if process_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve process information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': process_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting process info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting process info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/sensors', methods=['GET'])
+def get_sensors_info():
+    """Get temperature and sensor information"""
+    try:
+        monitoring_service = get_monitoring_service()
+        sensors_info = monitoring_service.get_sensors_info()
+        
+        if sensors_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve sensors information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': sensors_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting sensors info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting sensors info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/uptime', methods=['GET'])
+def get_uptime_info():
+    """Get system uptime information"""
+    try:
+        monitoring_service = get_monitoring_service()
+        uptime_info = monitoring_service.get_uptime_info()
+        
+        if uptime_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve uptime information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': uptime_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting uptime info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting uptime info: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/load', methods=['GET'])
+def get_system_load():
+    """Get system load average information"""
+    try:
+        monitoring_service = get_monitoring_service()
+        load_info = monitoring_service.get_system_load()
+        
+        if load_info is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve system load information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': load_info
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting system load: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting system load: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/alerts', methods=['GET'])
+def get_alerts():
+    """Get system alerts"""
+    try:
+        monitoring_service = get_monitoring_service()
+        alerts = monitoring_service.get_alert_info()
+        
+        if alerts is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve alert information'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': alerts
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting alerts: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting alerts: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/summary', methods=['GET'])
+def get_system_summary():
+    """Get summarized system metrics"""
+    try:
+        monitoring_service = get_monitoring_service()
+        summary = monitoring_service.get_system_summary()
+        
+        return jsonify({
+            'success': True,
+            'data': summary
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting system summary: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting system summary: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/historical/<plugin>', methods=['GET'])
+def get_historical_data(plugin: str):
+    """Get historical data for a specific plugin"""
+    try:
+        nb = int(request.args.get('entries', 10))
+        monitoring_service = get_monitoring_service()
+        historical_data = monitoring_service.get_historical_data(plugin, nb=nb)
+        
+        if historical_data is None:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to retrieve historical data for {plugin}'
+            }), 500
+        
+        return jsonify({
+            'success': True,
             'data': {
-                'overall_status': overall_status,
-                'resource_status': resource_status,
-                'services': {
-                    'total': total_services,
-                    'healthy': healthy_services,
-                    'unhealthy': total_services - healthy_services
-                },
-                'metrics': metrics.to_dict() if metrics else None,
-                'last_updated': metrics.timestamp.isoformat() if metrics else None
+                'plugin': plugin,
+                'entries': historical_data,
+                'count': len(historical_data)
+            }
+        })
+        
+    except ValueError:
+        return jsonify({
+            'success': False,
+            'error': 'Invalid entries parameter, must be integer'
+        }), 400
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting historical data for {plugin}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting historical data for {plugin}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/plugins', methods=['GET'])
+def get_plugins_list():
+    """Get list of available Glances plugins"""
+    try:
+        monitoring_service = get_monitoring_service()
+        plugins = monitoring_service.get_plugin_list()
+        
+        if plugins is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to retrieve plugins list'
+            }), 500
+        
+        return jsonify({
+            'success': True,
+            'data': plugins
+        })
+        
+    except MonitoringServiceError as e:
+        logger.error(f"Monitoring service error getting plugins list: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting plugins list: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'Internal server error'
+        }), 500
+
+@system_bp.route('/health', methods=['GET'])
+def check_monitoring_health():
+    """Check monitoring service health"""
+    try:
+        monitoring_service = get_monitoring_service()
+        is_healthy = monitoring_service.test_connection()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'healthy': is_healthy,
+                'service': 'Glances API',
+                'endpoint': f"{monitoring_service.base_url}/api/{monitoring_service.api_version}",
+                'status': 'connected' if is_healthy else 'disconnected'
             }
         })
         
     except Exception as e:
-        logger.error(f"Error getting system status: {e}")
+        logger.error(f"Unexpected error checking monitoring health: {e}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-
-@system_bp.route('/api/system/cache/clear', methods=['POST'])
-def clear_cache():
-    """Clear monitoring cache."""
-    try:
-        system_bp.monitoring_service.clear_cache()
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Cache cleared successfully'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error clearing cache: {e}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'success': False,
+            'error': 'Internal server error'
         }), 500

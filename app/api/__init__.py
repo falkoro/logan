@@ -1,10 +1,6 @@
-"""API package initialization."""
-from .containers import containers_bp, init_containers_api
-from .system import system_bp, init_system_api
+# API Module
+from .containers import containers_bp
+from .system import system_bp
+from .health import health_bp
 
-__all__ = [
-    'containers_bp',
-    'system_bp', 
-    'init_containers_api',
-    'init_system_api'
-]
+__all__ = ['containers_bp', 'system_bp', 'health_bp']

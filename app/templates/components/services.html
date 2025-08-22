@@ -1,0 +1,170 @@
+<!-- Services Directory -->
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Services Directory</h2>
+            <p class="text-gray-500 dark:text-gray-400">Quick access to all managed services and applications</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <button onclick="checkAllServices()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-heartbeat mr-2"></i>
+                Health Check
+            </button>
+            <button onclick="refreshServices()" class="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Service Categories -->
+    <div class="space-y-8">
+        <!-- Media Services -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                        <i class="fas fa-film text-purple-600 mr-3"></i>
+                        Media Services
+                        <span class="ml-2 px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-300 text-xs rounded-full">VPN Required</span>
+                    </h3>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        Port Range: 101-106
+                    </div>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="media-services">
+                    <!-- Media services will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Services -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                        <i class="fas fa-server text-blue-600 mr-3"></i>
+                        Core Services
+                    </h3>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        Essential Services
+                    </div>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="core-services">
+                    <!-- Core services will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Monitoring Services -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                        <i class="fas fa-chart-line text-green-600 mr-3"></i>
+                        Monitoring Services
+                    </h3>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        Port Range: 108-110
+                    </div>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="monitoring-services">
+                    <!-- Monitoring services will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Gaming Services -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                        <i class="fas fa-gamepad text-orange-600 mr-3"></i>
+                        Gaming Services
+                    </h3>
+                    <div class="text-sm text-gray-500 dark:text-gray-400">
+                        Game Servers
+                    </div>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="gaming-services">
+                    <!-- Gaming services will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Status Summary -->
+    <div class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900 dark:to-purple-900 rounded-xl p-6 border border-blue-200 dark:border-blue-800">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Service Health Overview</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="text-center">
+                <div class="text-2xl font-bold text-green-600 dark:text-green-400" id="healthy-services">-</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Healthy</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400" id="warning-services">-</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Warning</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-red-600 dark:text-red-400" id="unhealthy-services">-</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Unhealthy</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold text-gray-600 dark:text-gray-400" id="unknown-services">-</div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">Unknown</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <i class="fas fa-external-link-alt text-blue-500 mr-2"></i>
+                Quick Access Links
+            </h3>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" id="quick-links">
+                <!-- Quick links will be populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Service Detail Modal -->
+<div id="service-modal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full mx-4">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 id="service-modal-title" class="text-xl font-bold text-gray-900 dark:text-white">Service Details</h3>
+                <button onclick="closeServiceModal()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div id="service-modal-content" class="p-6">
+            <!-- Modal content will be populated by JavaScript -->
+        </div>
+        
+        <div class="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-4">
+            <button onclick="closeServiceModal()" class="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg transition-colors">
+                Close
+            </button>
+            <button id="service-modal-visit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-external-link-alt mr-2"></i>
+                Visit Service
+            </button>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,227 @@
+<!-- System Monitoring -->
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900 dark:text-white">System Monitoring</h2>
+            <p class="text-gray-500 dark:text-gray-400">Real-time system performance metrics via Glances</p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                <div class="w-2 h-2 rounded-full bg-green-500 mr-2 animate-pulse"></div>
+                <span>Live monitoring</span>
+            </div>
+            <button onclick="refreshSystemData()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+                <i class="fas fa-sync-alt mr-2"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- System Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- CPU Usage -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">CPU Usage</h3>
+                <i class="fas fa-microchip text-blue-500"></i>
+            </div>
+            <div class="relative mb-4">
+                <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <span id="system-cpu-percent">-</span>%
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    <span id="system-cpu-cores">- cores</span>
+                </div>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div id="system-cpu-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Memory Usage -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Memory Usage</h3>
+                <i class="fas fa-memory text-green-500"></i>
+            </div>
+            <div class="relative mb-4">
+                <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <span id="system-memory-percent">-</span>%
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    <span id="system-memory-used">- GB</span> / <span id="system-memory-total">- GB</span>
+                </div>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div id="system-memory-bar" class="bg-green-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Disk Usage -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Disk Usage</h3>
+                <i class="fas fa-hdd text-orange-500"></i>
+            </div>
+            <div class="relative mb-4">
+                <div class="text-2xl font-bold text-gray-900 dark:text-white">
+                    <span id="system-disk-percent">-</span>%
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">
+                    <span id="system-disk-used">- GB</span> / <span id="system-disk-total">- GB</span>
+                </div>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div id="system-disk-bar" class="bg-orange-600 h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <!-- Network Activity -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-medium text-gray-500 dark:text-gray-400">Network</h3>
+                <i class="fas fa-network-wired text-purple-500"></i>
+            </div>
+            <div class="relative mb-4">
+                <div class="text-sm text-gray-500 dark:text-gray-400">RX</div>
+                <div class="text-lg font-bold text-gray-900 dark:text-white">
+                    <span id="system-network-rx">- MB</span>
+                </div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">TX</div>
+                <div class="text-lg font-bold text-gray-900 dark:text-white">
+                    <span id="system-network-tx">- MB</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- CPU History Chart -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">CPU History</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="cpu-chart" width="400" height="200"></canvas>
+            </div>
+        </div>
+
+        <!-- Memory History Chart -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Memory History</h3>
+            </div>
+            <div class="p-6">
+                <canvas id="memory-chart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Details -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- System Information -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                    System Info
+                </h3>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Hostname:</span>
+                        <span id="sys-hostname" class="text-gray-900 dark:text-white font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Platform:</span>
+                        <span id="sys-platform" class="text-gray-900 dark:text-white font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Uptime:</span>
+                        <span id="sys-uptime" class="text-gray-900 dark:text-white font-medium">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500 dark:text-gray-400">Load Avg:</span>
+                        <span id="sys-load" class="text-gray-900 dark:text-white font-medium">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disk Information -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-hdd text-orange-500 mr-2"></i>
+                    Disk Mounts
+                </h3>
+            </div>
+            <div class="p-6">
+                <div id="disk-mounts" class="space-y-3">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Interfaces -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-network-wired text-purple-500 mr-2"></i>
+                    Network Interfaces
+                </h3>
+            </div>
+            <div class="p-6">
+                <div id="network-interfaces" class="space-y-3">
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mb-2"></div>
+                        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Process List -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+        <div class="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                    <i class="fas fa-tasks text-green-500 mr-2"></i>
+                    Top Processes
+                </h3>
+                <button onclick="refreshProcessList()" class="px-3 py-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded text-sm">
+                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                </button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Process</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">PID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">CPU %</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Memory %</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="process-table" class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    <!-- Process list will be populated by JavaScript -->
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                            <p class="mt-2">Loading processes...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

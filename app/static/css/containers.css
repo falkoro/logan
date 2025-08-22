@@ -1,0 +1,192 @@
+/**
+ * Container Cards Drag & Drop Styles
+ */
+
+/* Grid view specific styles */
+#containers-grid[data-view-mode="grid"] .container-card {
+    position: relative;
+    min-width: 280px;
+    min-height: 240px;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Hover effects for container cards */
+.container-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Dragging state */
+.container-card.dragging {
+    transform: rotate(5deg) scale(1.05);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    opacity: 0.9;
+    transition: none;
+}
+
+/* Resizing state */
+.container-card.resizing {
+    transition: none;
+    user-select: none;
+}
+
+/* Drag handle styles */
+.drag-handle {
+    transition: opacity 0.2s ease;
+    cursor: grab;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.container-card:not(:hover) .drag-handle {
+    opacity: 0.3;
+}
+
+/* Resize handle styles */
+.resize-handle {
+    transition: opacity 0.2s ease;
+}
+
+.container-card:not(:hover) .resize-handle {
+    opacity: 0.5;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+}
+
+/* Enhanced borders */
+.container-card {
+    border: 2px solid;
+    border-color: #e5e7eb; /* gray-200 */
+    border-radius: 0.75rem;
+    overflow: hidden;
+    position: relative;
+}
+
+.dark .container-card {
+    border-color: #374151; /* gray-700 */
+}
+
+/* Special border states */
+.container-card[data-status="running"] {
+    border-left: 4px solid #10b981; /* green-500 */
+}
+
+.container-card[data-status="stopped"] {
+    border-left: 4px solid #ef4444; /* red-500 */
+}
+
+.container-card[data-health="unhealthy"] {
+    border-right: 4px solid #f59e0b; /* amber-500 */
+}
+
+/* Selected state */
+.container-card.ring-2 {
+    border-color: #3b82f6; /* blue-500 */
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+/* Progress bars */
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* List view adjustments */
+#containers-grid[data-view-mode="list"] .container-card {
+    min-height: auto;
+    display: flex;
+    align-items: center;
+}
+
+#containers-grid[data-view-mode="list"] .drag-handle,
+#containers-grid[data-view-mode="list"] .resize-handle {
+    display: none;
+}
+
+/* Responsive grid */
+@media (max-width: 768px) {
+    #containers-grid[data-view-mode="grid"] {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .container-card {
+        min-width: 100%;
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+    #containers-grid[data-view-mode="grid"] {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+/* Animation for new containers */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.container-card {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* Loading states */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading-shimmer 1.5s infinite;
+}
+
+.dark .loading-skeleton {
+    background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+    background-size: 200% 100%;
+}
+
+@keyframes loading-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Error state borders */
+.container-card[data-error="true"] {
+    border-color: #dc2626; /* red-600 */
+    background-color: #fef2f2; /* red-50 */
+}
+
+.dark .container-card[data-error="true"] {
+    background-color: #450a0a; /* red-950 */
+}
+
+/* Tooltip styles */
+.tooltip {
+    position: absolute;
+    z-index: 1000;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.tooltip.show {
+    opacity: 1;
+    transform: translateY(0);
+}
